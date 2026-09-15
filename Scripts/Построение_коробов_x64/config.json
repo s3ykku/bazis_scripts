@@ -1,0 +1,244 @@
+{
+	"core": {
+		"x": 256,
+		"y": 256,
+		"z": 256,
+		"innerBlockWidth": 224,
+		"innerBlockHeight": 224,
+		"innerBlockDepth": 240,
+		"blockName": "Блок",
+		"blockVariant": 0,
+		"backSideVariant": 0,
+		"topSideVariant": 0,
+		"bottomSideVariant": 0,
+		"plinthSize": 60,
+		"frontPlinthIndent": 10,
+		"backPlinthIndent": 30,
+		"buttVariant": 1,
+		"backSideMoveZ": 0,
+		"blockMaterial": {
+			"name": "ЛДСП (2800*2070) 16мм Белая шагрень 0101 PE Крш 2 гр\r2000001114469",
+			"width": -1,
+			"thickness": 16
+		},
+		"backSideMaterial": {
+			"name": "ЛДСП (2800*2070) 16мм Белая шагрень 0101 PE Крш 2 гр\r2000001114469",
+			"width": -1,
+			"thickness": 16
+		},
+		"buttMaterial": {
+			"name": "Кромка ПВХ (1,0*19) Белая шагрень 0101 PE Крш 2 гр\r2000000820125",
+			"thickness": 1,
+			"width": 19,
+			"isTape": true,
+			"sign": "Бела шагр 1,0*19",
+			"overhung": 0,
+			"doClipPanel": 1,
+			"allowance": 1,
+			"doSingleCut": false,
+			"edging": "",
+			"cutName": "",
+			"doAddAllowanceToCurviLine": true
+		},
+		"mainBlockFurnMountVariant": 1,
+		"backFurnMountVariant": 0,
+		"mainBlockFurnBaseX": 0,
+		"mainBlockFurnBaseY": 0,
+		"mainBlockFurnBaseZ": 0,
+		"sectionCount": 0,
+		"sectionVariant": 0,
+		"reducedSection": 1,
+		"sectionSizes": {
+			"1": [
+				224
+			],
+			"2": [
+				104,
+				104
+			],
+			"3": [
+				64,
+				64,
+				64
+			],
+			"4": [
+				44,
+				44,
+				44,
+				44
+			]
+		},
+		"shelves": {
+			"1": [
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				}
+			],
+			"2": [
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				},
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				}
+			],
+			"3": [
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				},
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				},
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				}
+			],
+			"4": [
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				},
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				},
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				},
+				{
+					"enabled": false,
+					"count": 1,
+					"layout": 0,
+					"top": 104,
+					"bottom": 104,
+					"topFixed": false,
+					"bottomFixed": false
+				}
+			]
+		},
+		"shelfFurnMountVariant": 2,
+		"facadeVariant": 0,
+		"facadeMountVariant": 0,
+		"facadeMaterial": {
+			"name": "ЛДСП (2800*2070) 16мм Белая шагрень 0101 PE Крш 2 гр\r2000001114469",
+			"width": -1,
+			"thickness": 16
+		},
+		"facadeButtMaterial": {
+			"name": "Кромка ПВХ (1,0*19) Белая шагрень 0101 PE Крш 2 гр\r2000000820125",
+			"thickness": 1,
+			"width": 19,
+			"isTape": true,
+			"sign": "Бела шагр 1,0*19",
+			"overhung": 0,
+			"doClipPanel": 1,
+			"allowance": 1,
+			"doSingleCut": false,
+			"edging": "",
+			"cutName": "",
+			"doAddAllowanceToCurviLine": true
+		},
+		"facadeGap": 2,
+		"facadeIndent": 2,
+		"shelfIndent": 0,
+		"facadeEditableOrientation": 0,
+		"facadeEditableCount": 1,
+		"facadeEditableLayout": 0,
+		"facadeEditableBase": 0,
+		"facadeEditableSize1": 252,
+		"facadeEditableSize2": 252,
+		"facadeJointSides": {
+			"1": [
+				0,
+				0,
+				0
+			],
+			"4": [
+				null,
+				0,
+				0
+			]
+		},
+		"numberElements": true,
+		"furnitureInfo": null,
+		"backFurnitureInfo": null,
+		"shelfFurnitureInfo": null,
+		"facadeFurnitureInfo": null,
+		"halfFacadeFurnitureInfo": null
+	},
+	"interface": {
+		"bottomSideVariantPanelVisible": true,
+		"backPlinthIndentPanelVisible": false,
+		"frontPlinthIndentPanelVisible": false,
+		"plinthSizePanelVisible": false,
+		"backSideMoveZPanelVisible": true,
+		"sectionVariantPanelVisible": false,
+		"mainFormHeight": 614,
+		"reducedSectionPanelVisible": false,
+		"facadeMountVariantPanelVisible": false,
+		"facadeGapPanelVisible": false,
+		"facadeFillingGapPanelVisible": true,
+		"facadeIndentPanelVisible": false,
+		"shelfIndentPanelVisible": true,
+		"facadeMaterialPanelVisible": false,
+		"facadeButtMaterialPanelVisible": false,
+		"facadeEditableOrientationPanelVisible": false,
+		"facadeEditableCountPanelVisible": false,
+		"facadeEditableLayoutPanelVisible": false,
+		"facadeEditableBasePanelVisible": false,
+		"facadeEditableSize1PanelVisible": false,
+		"facadeEditableSize2PanelVisible": false
+	}
+}
