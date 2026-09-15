@@ -16,6 +16,9 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 const CONFIG = require('./config.json');
 const CORE_CONFIG = CONFIG.core;
 const INTERFACE_CONFIG = CONFIG.interface;
+// Минимальный зазор между двумя горизонтальными планками крышки. Размер в
+// форме задаёт ширину самих планок, а фактический зазор остаётся в центре.
+const TOP_STRIP_GAP = 2;
 
 // Архитектура: core хранит параметры и строит модель, interface управляет
 // формой, а CONFIG используется и как основной config.json, и как шаблон.
@@ -302,7 +305,13 @@ function coreConfigValues(cfg) {
 		blockName: cfg.blockName,
 		blockVariant: cfg.blockVariant,
 		backSideVariant: cfg.backSideVariant,
-		topSideVariant: cfg.topSideVariant,
+		// 0 Накладная / 1 Вкладная / 2 Горизонтальные планки / 3 Вертикальные планки.
+		topSideVariant:
+			Number.isInteger(cfg.topSideVariant) && cfg.topSideVariant >= 0 && cfg.topSideVariant <= 3
+				? cfg.topSideVariant
+				: 0,
+		// Ширина каждой планки; обе растут от краёв крышки к её центру.
+		topStripSize: Number.isFinite(cfg.topStripSize) ? cfg.topStripSize : 100,
 		bottomSideVariant: cfg.bottomSideVariant,
 		x: cfg.x,
 		y: cfg.y,
@@ -334,6 +343,10 @@ function coreConfigValues(cfg) {
 		// Нумеровать полки/перегородки/фасады номером секции/позиции в имени
 		// объекта. По умолчанию включено, поэтому проверка через !== false.
 		numberElements: cfg.numberElements !== false,
+		// Направление текстуры определяется ориентацией панели: вертикальные
+		// и фронтальные — вертикально, горизонтальные — горизонтально.
+		// Для старых конфигураций настройка включена по умолчанию.
+		textureOrientation: cfg.textureOrientation !== false,
 		shelfFurnitureInfo: loadFurnitureInfo(cfg.shelfFurnitureInfo),
 		shelfFurnMountVariant: cfg.shelfFurnMountVariant || 0,
 		sectionCount: cfg.sectionCount,
@@ -435,6 +448,35 @@ const core = {
 			const obj = block.Objects[i];
 			if (objectTypeChecker.ObjectIsPanel(obj)) obj.Build();
 		}
+	},
+
+	// Ограничивает размер планки доступным пространством. Горизонтальные
+	// планки растут вглубь до центрального зазора; вертикальные — вниз от
+	// верхнего края корпуса.
+	normalizeTopStripSize() {
+		if (this.topSideVariant !== 2 && this.topSideVariant !== 3) return this.topStripSize;
+		const t = this.blockMaterial.thickness;
+		const frontOffset =
+			this.facadeVariant !== 0 && this.facadeMountVariant === 0 ? this.facadeMaterial.thickness : 0;
+		const maximum =
+			this.topSideVariant === 2
+				? Math.max(1, (this.z - frontOffset - TOP_STRIP_GAP) / 2)
+				: Math.max(1, this.y - t);
+		this.topStripSize = Math.max(1, Math.min(Number(this.topStripSize) || 1, maximum));
+		return this.topStripSize;
+	},
+
+	// Создаёт панель и сразу задаёт направление текстуры по её ориентации.
+	// Фронтальные панели по принятому правилу относятся к вертикальным.
+	newPanel(width, height, orientation, owner) {
+		const panel = objects3d.NewPanel(width, height, orientation, owner);
+		if (this.textureOrientation) {
+			panel.TextureOrientation =
+				orientation === objects3d.PanelOrientation.horizont
+					? panelOperations.textureOrientation.horizontal
+					: panelOperations.textureOrientation.vertical;
+		}
+		return panel;
 	},
 
 	// Сохраняет чистый габарит корпуса до добавления выступающей фурнитуры.
@@ -630,12 +672,16 @@ const core = {
 							round(this.backPlinthIndent),
 							this.blockVariant === 1 ? round(this.frontPlinthIndent) : 0,
 						],
-			top: this.topSideVariant,
+			top:
+				this.topSideVariant < 2
+					? this.topSideVariant
+					: [this.topSideVariant, round(this.normalizeTopStripSize())],
 			bottom: this.blockVariant === 1 ? 1 : this.bottomSideVariant,
 			sectionWidths: sectionWidths.map(round),
 			shelves,
 			// Отступ полок не зависит от наличия фасадов (см. shelfClearance выше).
 			shelfIndent: shelves.some(Boolean) ? round(this.shelfIndent) : 0,
+			textureOrientation: this.textureOrientation,
 			facade,
 		});
 	},
@@ -844,7 +890,9 @@ const core = {
 
 		const t = this.blockMaterial.thickness;
 
-		const top = this.topSideVariant; // 0 - накладная крышка, 1 - вкладная
+		const top = this.topSideVariant;
+		// Планки всегда вкладные: 2 — горизонтальные, 3 — вертикальные.
+		const topEff = top === 0 ? 0 : 1;
 
 		// Дно у варианта "с цоколем" всегда вкладное (1), т.к. его
 		// вариант наложения не выбирается пользователем. У простого
@@ -894,32 +942,83 @@ const core = {
 		// top === 0 или bottomEff === 0 означает "торец панели подрезан
 		// на толщину соседней панели" -> из высоты вычитается t за
 		// каждую такую грань. P дополнительно отрезает низ у подиума.
-		const sideHeight = sY - P - t * (top === 0 ? 1 : 0) - t * (bottomEff === 0 ? 1 : 0);
+		const sideHeight = sY - P - t * (topEff === 0 ? 1 : 0) - t * (bottomEff === 0 ? 1 : 0);
 		const sideY = P + t * (1 - bottomEff);
 
-		let bLeftSide = objects3d.NewPanel(boxFrontZ, sideHeight, objects3d.PanelOrientation.vertical, block);
+		let bLeftSide = this.newPanel(boxFrontZ, sideHeight, objects3d.PanelOrientation.vertical, block);
 		bLeftSide.Translate({ x: t, y: sideY, z: 0 });
 		bLeftSide.Name = 'боковина левая';
 
 		// ----- Боковина правая [1] -----
-		let bRightSide = objects3d.NewPanel(boxFrontZ, sideHeight, objects3d.PanelOrientation.vertical, block);
+		let bRightSide = this.newPanel(boxFrontZ, sideHeight, objects3d.PanelOrientation.vertical, block);
 		bRightSide.Translate({ x: sX, y: sideY, z: 0 });
 		bRightSide.Name = 'боковина правая';
 
 		// ----- Горизонт верхний [2] -----
-		// Не зависит от blockVariant, Q и P — крышка всегда садится
-		// на верх боковин по тем же правилам, что и в простом блоке.
-		let bTopSide = objects3d.NewPanel(
-			top === 0 ? sX : sX - 2 * t,
-			boxFrontZ,
-			objects3d.PanelOrientation.horizont,
-			block,
-		);
-		bTopSide.Translate({ x: top === 0 ? 0 : t, y: sY - t, z: boxFrontZ });
-		bTopSide.Name = 'горизонт верхний';
+		// В обычных вариантах это одна крышка; у планок — две вкладные панели,
+		// которые идут от противоположных краёв к центральному зазору.
+		const bTopSides = [];
+		if (top === 2) {
+			const stripSize = this.normalizeTopStripSize();
+			const frontStrip = this.newPanel(
+				sX - 2 * t,
+				stripSize,
+				objects3d.PanelOrientation.horizont,
+				block,
+			);
+			frontStrip.Translate({ x: t, y: sY - t, z: boxFrontZ });
+			frontStrip.Name = 'планка крышки передняя';
+			bTopSides.push(frontStrip);
+
+			const backStrip = this.newPanel(
+				sX - 2 * t,
+				stripSize,
+				objects3d.PanelOrientation.horizont,
+				block,
+			);
+			backStrip.Translate({ x: t, y: sY - t, z: stripSize });
+			backStrip.Name = 'планка крышки задняя';
+			bTopSides.push(backStrip);
+		} else if (top === 3) {
+			const stripSize = this.normalizeTopStripSize();
+			// Вертикальные планки идут от одной боковины до другой и стоят
+			// параллельно фасадам и задней стенке.
+			const frontStrip = this.newPanel(
+				sX - 2 * t,
+				stripSize,
+				objects3d.PanelOrientation.front,
+				block,
+			);
+			// Верх планки совмещён с верхним габаритом корпуса, а её лицевая
+			// пласть утоплена на толщину материала — внутри корпуса, не на
+			// плоскости накладного фасада.
+			frontStrip.Translate({ x: t, y: sY - stripSize, z: boxFrontZ - t });
+			frontStrip.Name = 'планка крышки передняя';
+			bTopSides.push(frontStrip);
+
+			const backStrip = this.newPanel(
+				sX - 2 * t,
+				stripSize,
+				objects3d.PanelOrientation.front,
+				block,
+			);
+			backStrip.Translate({ x: t, y: sY - stripSize, z: 0 });
+			backStrip.Name = 'планка крышки задняя';
+			bTopSides.push(backStrip);
+		} else {
+			const bTopSide = this.newPanel(
+				topEff === 0 ? sX : sX - 2 * t,
+				boxFrontZ,
+				objects3d.PanelOrientation.horizont,
+				block,
+			);
+			bTopSide.Translate({ x: topEff === 0 ? 0 : t, y: sY - t, z: boxFrontZ });
+			bTopSide.Name = 'горизонт верхний';
+			bTopSides.push(bTopSide);
+		}
 
 		// ----- Горизонт нижний [3] -----
-		let bBottomSide = objects3d.NewPanel(
+		let bBottomSide = this.newPanel(
 			bottomEff === 0 ? sX : sX - 2 * t,
 			boxFrontZ,
 			objects3d.PanelOrientation.horizont,
@@ -929,12 +1028,14 @@ const core = {
 		bBottomSide.Name = 'горизонт нижний';
 
 		// ----- Пары для схемы крепежа: крышка/боковины -----
-		if (top === 0) {
+		if (topEff === 0) {
 			// Накладная крышка: торец боковины перекрывается плоскостью крышки.
-			this.panelPairs.push([bLeftSide, bTopSide], [bRightSide, bTopSide]);
+			this.panelPairs.push([bLeftSide, bTopSides[0]], [bRightSide, bTopSides[0]]);
 		} else {
-			// Вкладная крышка: торец крышки перекрывается плоскостями боковин.
-			this.panelPairs.push([bTopSide, bLeftSide], [bTopSide, bRightSide]);
+			// Вкладная крышка или планки: торцы планок крепятся к боковинам.
+			for (const topSide of bTopSides) {
+				this.panelPairs.push([topSide, bLeftSide], [topSide, bRightSide]);
+			}
 		}
 
 		// ----- Пары для схемы крепежа: дно/боковины -----
@@ -949,7 +1050,7 @@ const core = {
 		switch (this.backSideVariant) {
 			case 0: {
 				// ----- Задняя стенка [4] -----
-				const bBackSide = objects3d.NewPanel(
+				const bBackSide = this.newPanel(
 					sX - t * 2,
 					sY - t * 2 - Q,
 					objects3d.PanelOrientation.front,
@@ -965,12 +1066,9 @@ const core = {
 				// ЗС всегда первая в паре; основной крепёж сюда не попадает.
 				if (this.hasBackFurnitureSupport()) {
 					furnitureBackSide = bBackSide;
-					this.backPanelPairs.push(
-						[bBackSide, bTopSide],
-						[bBackSide, bBottomSide],
-						[bBackSide, bLeftSide],
-						[bBackSide, bRightSide],
-					);
+					const backTopSides = top === 2 || top === 3 ? [bTopSides[1]] : bTopSides;
+					for (const topSide of backTopSides) this.backPanelPairs.push([bBackSide, topSide]);
+					this.backPanelPairs.push([bBackSide, bBottomSide], [bBackSide, bLeftSide], [bBackSide, bRightSide]);
 				}
 
 				this.innerBlockDepth = partitionFrontZ - moveBackSideZ - this.backSideMaterial.thickness;
@@ -981,7 +1079,7 @@ const core = {
 				this.applyCustomGroove(block, Q, moveBackSideZ);
 
 				// ----- Задняя стенка [4] -----
-				const bBackSide = objects3d.NewPanel(
+				const bBackSide = this.newPanel(
 					sX - t - 1,
 					sY - t - 1 - Q,
 					objects3d.PanelOrientation.front,
@@ -999,7 +1097,7 @@ const core = {
 				this.applyCustomGroove(block, Q, 0);
 
 				// ----- Задняя стенка [4] -----
-				const bBackSide = objects3d.NewPanel(
+				const bBackSide = this.newPanel(
 					sX - 2 * t + 20 - 1,
 					sY - 2 * t + 20 - 1 - Q,
 					objects3d.PanelOrientation.front,
@@ -1014,7 +1112,7 @@ const core = {
 			}
 			case 3: {
 				// ----- Задняя стенка [4] -----
-				const bBackSide = objects3d.NewPanel(sX - 4, sY - 4 - Q, objects3d.PanelOrientation.front, block);
+				const bBackSide = this.newPanel(sX - 4, sY - 4 - Q, objects3d.PanelOrientation.front, block);
 				bBackSide.Translate({
 					x: 2,
 					y: 2 + Q,
@@ -1045,12 +1143,12 @@ const core = {
 			const frontZ = (this.blockVariant === 1 ? boxFrontZ : sZ) - t - (this.blockVariant === 1 ? plinthIndF : 0);
 
 			// ----- Цоколь передний [5] -----
-			bFrontPlinthSide = objects3d.NewPanel(sX - t * 2, sPlinth, objects3d.PanelOrientation.front, block);
+			bFrontPlinthSide = this.newPanel(sX - t * 2, sPlinth, objects3d.PanelOrientation.front, block);
 			bFrontPlinthSide.Translate({ x: t, y: 0, z: frontZ });
 			bFrontPlinthSide.Name = 'цоколь передний';
 
 			// ----- Цоколь задний [6] -----
-			bBackPlinthSide = objects3d.NewPanel(sX - t * 2, sPlinth, objects3d.PanelOrientation.front, block);
+			bBackPlinthSide = this.newPanel(sX - t * 2, sPlinth, objects3d.PanelOrientation.front, block);
 			bBackPlinthSide.Translate({ x: t, y: 0, z: plinthIndB });
 			bBackPlinthSide.Name = 'цоколь задний';
 
@@ -1078,7 +1176,7 @@ const core = {
 		// ----- Панели тумбы подиума: только у подиума -----
 		if (this.blockVariant === 2) {
 			// ----- Боковина подиума левая [7] -----
-			let bLeftPlinthSide = objects3d.NewPanel(
+			let bLeftPlinthSide = this.newPanel(
 				sZ - plinthIndB,
 				sPlinth,
 				objects3d.PanelOrientation.vertical,
@@ -1088,7 +1186,7 @@ const core = {
 			bLeftPlinthSide.Name = 'боковина подиума левая';
 
 			// ----- Боковина подиума правая [8] -----
-			let bRightPlinthSide = objects3d.NewPanel(
+			let bRightPlinthSide = this.newPanel(
 				sZ - plinthIndB,
 				sPlinth,
 				objects3d.PanelOrientation.vertical,
@@ -1107,7 +1205,7 @@ const core = {
 
 			// ----- Цоколь лицевой [9] -----
 			// Не крепится — исключён из panelPairs намеренно.
-			let bFacePlinthSide = objects3d.NewPanel(sX - 4, sPlinth - 4, objects3d.PanelOrientation.front, block);
+			let bFacePlinthSide = this.newPanel(sX - 4, sPlinth - 4, objects3d.PanelOrientation.front, block);
 			bFacePlinthSide.Translate({ x: 2, y: 2, z: sZ });
 			bFacePlinthSide.Name = 'цоколь лицевой';
 			// Материал фасадов по умолчанию равен материалу корпуса,
@@ -1115,7 +1213,7 @@ const core = {
 			materialData.SetupObjectMaterial(bFacePlinthSide, this.facadeMaterial, true);
 
 			// ----- Горизонт подиума [10] -----
-			let bTopPlinthSide = objects3d.NewPanel(
+			let bTopPlinthSide = this.newPanel(
 				sX - 2 * t,
 				sZ - 2 * t - plinthIndB,
 				objects3d.PanelOrientation.horizont,
@@ -1136,7 +1234,7 @@ const core = {
 
 			for (let i = 0; i < this.sectionCount; i++) {
 				partitionX += sectionWidths[i] + t;
-				const partition = objects3d.NewPanel(
+				const partition = this.newPanel(
 					this.innerBlockDepth,
 					this.innerBlockHeight,
 					objects3d.PanelOrientation.vertical,
@@ -1157,7 +1255,8 @@ const core = {
 				partition.Name = this.numberElements ? `перегородка №${i + 1}` : 'перегородка';
 				// Пары основной схемы: перегородка/крышка и дно.
 				// Перегородка — первая в паре.
-				this.panelPairs.push([partition, bTopSide], [partition, bBottomSide]);
+				for (const topSide of bTopSides) this.panelPairs.push([partition, topSide]);
+				this.panelPairs.push([partition, bBottomSide]);
 				// Пара с ЗС принадлежит только отдельной схеме фурнитуры ЗС.
 				if (furnitureBackSide) this.backPanelPairs.push([partition, furnitureBackSide]);
 				sectionWalls.push(partition);
@@ -1175,7 +1274,7 @@ const core = {
 		for (let i = 0; i < sectionWidths.length; i++) {
 			if (this.getShelfSettings(i).enabled) {
 				for (let j = 0; j < shelfPositions[i].length; j++) {
-					const shelf = objects3d.NewPanel(
+					const shelf = this.newPanel(
 						sectionWidths[i],
 						shelfDepth,
 						objects3d.PanelOrientation.horizont,
@@ -1355,7 +1454,7 @@ const core = {
 		// index не передан) всегда называются просто "фасад", независимо
 		// от галочки "Нумеровать элементы".
 		const addFacade = (left, right, bottom, top, z, index) => {
-			const facade = objects3d.NewPanel(right - left, top - bottom, objects3d.PanelOrientation.front, block);
+			const facade = this.newPanel(right - left, top - bottom, objects3d.PanelOrientation.front, block);
 			facade.Translate({ x: left, y: bottom, z });
 			facade.Name = this.numberElements && index !== undefined ? `фасад сек. №${index + 1}` : 'фасад';
 			materialData.SetupObjectMaterial(facade, this.facadeMaterial, true);
@@ -1621,6 +1720,7 @@ const core = {
 		CORE_CONFIG.blockVariant = this.blockVariant;
 		CORE_CONFIG.backSideVariant = this.backSideVariant;
 		CORE_CONFIG.topSideVariant = this.topSideVariant;
+		CORE_CONFIG.topStripSize = this.topStripSize;
 		CORE_CONFIG.bottomSideVariant = this.bottomSideVariant;
 		CORE_CONFIG.x = this.x;
 		CORE_CONFIG.y = this.y;
@@ -1643,6 +1743,7 @@ const core = {
 		CORE_CONFIG.mainBlockFurnBaseY = this.mainBlockFurnBaseY;
 		CORE_CONFIG.mainBlockFurnBaseZ = this.mainBlockFurnBaseZ;
 		CORE_CONFIG.numberElements = this.numberElements;
+		CORE_CONFIG.textureOrientation = this.textureOrientation;
 		CORE_CONFIG.shelfFurnitureInfo = saveFurnitureInfo(this.shelfFurnitureInfo);
 		CORE_CONFIG.shelfFurnMountVariant = this.shelfFurnMountVariant;
 		CORE_CONFIG.sectionCount = this.sectionCount;
@@ -1750,6 +1851,7 @@ const interface = {
 	getItemVisibility() {
 		return {
 			bottomSideVariantPanelVisible: core.blockVariant !== 1,
+			topStripSizePanelVisible: core.topSideVariant === 2 || core.topSideVariant === 3,
 			backSideMoveZPanelVisible: core.backSideVariant === 0 || core.backSideVariant === 1,
 			plinthSizePanelVisible: core.blockVariant !== 0,
 			frontPlinthIndentPanelVisible: core.blockVariant === 1,
@@ -1866,6 +1968,7 @@ const interface = {
 		for (const widget of this.FILLING_WIDGETS) widget.Visible = isFilling;
 		for (const widget of this.FACADE_WIDGETS) widget.Visible = isFacades;
 		bottomSideVariantPanel.Visible = isCorpus && visibility.bottomSideVariantPanelVisible;
+		topStripSizePanel.Visible = isCorpus && visibility.topStripSizePanelVisible;
 		backSideMoveZPanel.Visible = isCorpus && visibility.backSideMoveZPanelVisible;
 		plinthSizePanel.Visible = isCorpus && visibility.plinthSizePanelVisible;
 		frontPlinthIndentPanel.Visible = isCorpus && visibility.frontPlinthIndentPanelVisible;
@@ -1967,6 +2070,7 @@ const interface = {
 			blockVariantComboBox.ItemIndex = core.blockVariant;
 			backSideVariantComboBox.ItemIndex = core.backSideVariant;
 			topSideVariantComboBox.ItemIndex = core.topSideVariant;
+			topStripSizeCalc.Value = core.topStripSize;
 			bottomSideVariantComboBox.ItemIndex = core.bottomSideVariant;
 			sizeXCalc.Value = core.x;
 			sizeYCalc.Value = core.y;
@@ -1986,6 +2090,8 @@ const interface = {
 			mainBlockFurnBaseZRow.edit.ItemIndex = core.mainBlockFurnBaseZ;
 			numberElementsCheckBox.Checked = core.numberElements;
 			numberElementsCheckBox.Caption = core.numberElements ? 'Да' : 'Нет';
+			textureOrientationCheckBox.Checked = core.textureOrientation;
+			textureOrientationCheckBox.Caption = core.textureOrientation ? 'Да' : 'Нет';
 			sectionCountComboBox.ItemIndex = core.sectionCount;
 			sectionVariantComboBox.ItemIndex = core.sectionVariant;
 			shelfIndentCalc.Value = core.shelfIndent;
@@ -2573,6 +2679,43 @@ numberElementsCheckBox.Properties.OnChange = () => {
 	core.saveConfig();
 };
 
+// ----- Ориентация текстуры -----
+const textureOrientationPanel = UI.components.NewPanel(mainForm, mainForm);
+textureOrientationPanel.Left = 0;
+textureOrientationPanel.Height = 30;
+textureOrientationPanel.Width = 300;
+textureOrientationPanel.ShowHint = true;
+textureOrientationPanel.BevelOuter = 0;
+textureOrientationPanel.ParentFont = true;
+
+interface.WIDGETS.push(textureOrientationPanel);
+interface.CORPUS_WIDGETS.push(textureOrientationPanel);
+
+const textureOrientationLabel = UI.components.NewLabel(textureOrientationPanel, textureOrientationPanel);
+textureOrientationLabel.Top = 5;
+textureOrientationLabel.Left = 5;
+textureOrientationLabel.AutoSize = false;
+textureOrientationLabel.Height = 25;
+textureOrientationLabel.Width = 145;
+textureOrientationLabel.Caption = 'Ориентация текстуры:';
+
+const textureOrientationCheckBox = UI.components.NewCheckBox(textureOrientationPanel, textureOrientationPanel);
+textureOrientationCheckBox.AutoSize = false;
+textureOrientationCheckBox.Top = 5;
+textureOrientationCheckBox.Left = 150;
+textureOrientationCheckBox.Height = 25;
+textureOrientationCheckBox.Width = 145;
+textureOrientationCheckBox.Checked = core.textureOrientation;
+textureOrientationCheckBox.Caption = core.textureOrientation ? 'Да' : 'Нет';
+
+// ----- Событие изменения "Ориентация текстуры" -----
+textureOrientationCheckBox.Properties.OnChange = () => {
+	core.textureOrientation = textureOrientationCheckBox.Checked;
+	textureOrientationCheckBox.Caption = core.textureOrientation ? 'Да' : 'Нет';
+	core.rebuildBlock('Ориентация текстуры изменена');
+	core.saveConfig();
+};
+
 // ----- Имя блока -----
 const blockNamePanel = UI.components.NewPanel(mainForm, mainForm);
 blockNamePanel.Left = 0;
@@ -2715,6 +2858,8 @@ const topSideVariantComboBox = UI.components.NewComboBox(topSideVariantPanel, to
 topSideVariantComboBox.Properties.DropDownListStyle = UI.constants.cxEditDropDownListStyle.fixedList;
 topSideVariantComboBox.Properties.Items.Add('Накладная');
 topSideVariantComboBox.Properties.Items.Add('Вкладная');
+topSideVariantComboBox.Properties.Items.Add('Горизонтальные планки');
+topSideVariantComboBox.Properties.Items.Add('Вертикальные планки');
 topSideVariantComboBox.Top = 5;
 topSideVariantComboBox.Left = 150;
 topSideVariantComboBox.AutoSize = false;
@@ -2725,7 +2870,47 @@ topSideVariantComboBox.ItemIndex = core.topSideVariant;
 // ----- Событие изменения "Наложение крышки" -----
 topSideVariantComboBox.Properties.OnChange = () => {
 	core.topSideVariant = topSideVariantComboBox.ItemIndex;
+	core.normalizeTopStripSize();
+	if (topStripSizeCalc.Value !== core.topStripSize) topStripSizeCalc.Value = core.topStripSize;
 	core.rebuildBlock('Наложение крышки изменено');
+	interface.relayoutMainForm();
+	core.saveConfig();
+};
+
+// ----- Размер планок крышки -----
+const topStripSizePanel = UI.components.NewPanel(mainForm, mainForm);
+topStripSizePanel.Left = 0;
+topStripSizePanel.Height = 30;
+topStripSizePanel.Width = 300;
+topStripSizePanel.ShowHint = true;
+topStripSizePanel.BevelOuter = 0;
+topStripSizePanel.ParentFont = true;
+
+interface.WIDGETS.push(topStripSizePanel);
+interface.CORPUS_WIDGETS.push(topStripSizePanel);
+
+const topStripSizeLabel = UI.components.NewLabel(topStripSizePanel, topStripSizePanel);
+topStripSizeLabel.Top = 5;
+topStripSizeLabel.Left = 5;
+topStripSizeLabel.AutoSize = false;
+topStripSizeLabel.Height = 25;
+topStripSizeLabel.Width = 145;
+topStripSizeLabel.Caption = 'Размер планок:';
+
+const topStripSizeCalc = UI.components.NewCalcEdit(topStripSizePanel, topStripSizePanel);
+topStripSizeCalc.AutoSize = false;
+topStripSizeCalc.Top = 5;
+topStripSizeCalc.Left = 150;
+topStripSizeCalc.Height = 25;
+topStripSizeCalc.Width = 145;
+topStripSizeCalc.Value = core.topStripSize;
+
+// ----- Событие изменения "Размер планок" -----
+topStripSizeCalc.Properties.OnEditValueChanged = () => {
+	core.topStripSize = topStripSizeCalc.Value;
+	core.normalizeTopStripSize();
+	if (topStripSizeCalc.Value !== core.topStripSize) topStripSizeCalc.Value = core.topStripSize;
+	core.rebuildBlock('Размер планок крышки изменён');
 	core.saveConfig();
 };
 

@@ -1,15 +1,15 @@
 {
 	"core": {
-		"x": 256,
-		"y": 256,
-		"z": 256,
-		"innerBlockWidth": 224,
-		"innerBlockHeight": 224,
+		"x": 1200,
+		"y": 720,
+		"z": 550,
+		"innerBlockWidth": 1168,
+		"innerBlockHeight": 688,
 		"innerBlockDepth": 240,
 		"blockName": "Блок",
 		"blockVariant": 0,
-		"backSideVariant": 0,
-		"topSideVariant": 0,
+		"backSideVariant": 3,
+		"topSideVariant": 2,
 		"bottomSideVariant": 0,
 		"plinthSize": 60,
 		"frontPlinthIndent": 10,
@@ -22,9 +22,9 @@
 			"thickness": 16
 		},
 		"backSideMaterial": {
-			"name": "ЛДСП (2800*2070) 16мм Белая шагрень 0101 PE Крш 2 гр\r2000001114469",
+			"name": "ЛХДФ (2800*2070) 3мм Белая шагрень 0101 PE Крш\r2000000000022",
 			"width": -1,
-			"thickness": 16
+			"thickness": 3
 		},
 		"buttMaterial": {
 			"name": "Кромка ПВХ (1,0*19) Белая шагрень 0101 PE Крш 2 гр\r2000000820125",
@@ -50,7 +50,7 @@
 		"reducedSection": 1,
 		"sectionSizes": {
 			"1": [
-				224
+				1168
 			],
 			"2": [
 				104,
@@ -74,8 +74,8 @@
 					"enabled": false,
 					"count": 1,
 					"layout": 0,
-					"top": 104,
-					"bottom": 104,
+					"top": 336,
+					"bottom": 336,
 					"topFixed": false,
 					"bottomFixed": false
 				}
@@ -216,16 +216,18 @@
 		"backFurnitureInfo": null,
 		"shelfFurnitureInfo": null,
 		"facadeFurnitureInfo": null,
-		"halfFacadeFurnitureInfo": null
+		"halfFacadeFurnitureInfo": null,
+		"topStripSize": 100,
+		"textureOrientation": true
 	},
 	"interface": {
 		"bottomSideVariantPanelVisible": true,
 		"backPlinthIndentPanelVisible": false,
 		"frontPlinthIndentPanelVisible": false,
 		"plinthSizePanelVisible": false,
-		"backSideMoveZPanelVisible": true,
+		"backSideMoveZPanelVisible": false,
 		"sectionVariantPanelVisible": false,
-		"mainFormHeight": 614,
+		"mainFormHeight": 612,
 		"reducedSectionPanelVisible": false,
 		"facadeMountVariantPanelVisible": false,
 		"facadeGapPanelVisible": false,
@@ -239,6 +241,7 @@
 		"facadeEditableLayoutPanelVisible": false,
 		"facadeEditableBasePanelVisible": false,
 		"facadeEditableSize1PanelVisible": false,
-		"facadeEditableSize2PanelVisible": false
+		"facadeEditableSize2PanelVisible": false,
+		"topStripSizePanelVisible": true
 	}
 }
